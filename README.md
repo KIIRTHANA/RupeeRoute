@@ -27,6 +27,24 @@ This project is ready for free deployment on Render using `render.yaml`.
 This app currently uses SQLite (`expenses.db`), so on free cloud instances data may reset after restarts/sleeps.
 If you want durable production data, switch to a managed database (PostgreSQL/MySQL).
 
+## GitHub Pages Hosting (Static Mode)
+
+This repo includes a static `index.html` for GitHub Pages.
+
+In GitHub:
+1. Open your repository settings.
+2. Go to **Pages**.
+3. Set source to **Deploy from a branch**.
+4. Select branch `main` and folder `/ (root)`.
+5. Save and wait 1-2 minutes.
+
+Your site URL will be:
+`https://kiirthana.github.io/RupeeRoute/`
+
+Notes:
+- GitHub Pages cannot run Flask/Python backends.
+- Static mode stores expenses in browser local storage.
+
 ## Features
 
 - Add expenses with amount, category, description, and date

@@ -1,5 +1,7 @@
 const API = "/api/expenses";
 const CURRENCY = "\u20B9";
+const IS_STATIC_MODE = window.location.protocol === "file:" || window.location.hostname.endsWith("github.io");
+const STORAGE_KEY = "rupee_route_expenses_v1";
 
 const CATEGORY_ICONS = {
   "Food & Dining": "\u{1F354}",
@@ -37,6 +39,10 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function loadUser() {
+  if (IS_STATIC_MODE) {
+    document.getElementById("user-name").textContent = "Guest";
+    return;
+  }
   try {
     const res = await fetch("/api/auth/me");
     if (!res.ok) {
@@ -51,6 +57,12 @@ async function loadUser() {
 }
 
 async function handleLogout() {
+  if (IS_STATIC_MODE) {
+    localStorage.removeItem(STORAGE_KEY);
+    showToast("Local expense data cleared");
+    refresh();
+    return;
+  }
   await fetch("/api/auth/logout", { method: "POST" });
   window.location.href = "/login";
 }
@@ -121,11 +133,9 @@ function buildQuery(filters) {
 
 async function refresh() {
   const filters = getFilters();
-  const query = buildQuery(filters);
-
   const [expenses, summary] = await Promise.all([
-    fetch(`${API}${query}`).then((r) => r.json()),
-    fetch(`/api/summary${query}`).then((r) => r.json()),
+    getExpenses(filters),
+    getSummary(filters),
   ]);
 
   renderExpenses(expenses);
@@ -219,15 +229,9 @@ async function handleAddExpense(e) {
   const description = document.getElementById("description").value;
   const date = document.getElementById("date").value;
 
-  const res = await fetch(API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, category, description, date }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    showToast(err.error || "Failed to add expense", "error");
+  const result = await addExpense({ amount, category, description, date });
+  if (!result.ok) {
+    showToast(result.error || "Failed to add expense", "error");
     return;
   }
 
@@ -241,7 +245,7 @@ async function handleAddExpense(e) {
 }
 
 async function deleteExpense(id) {
-  await fetch(`${API}/${id}`, { method: "DELETE" });
+  await removeExpense(id);
   showToast("Expense deleted");
   refresh();
 }
@@ -287,4 +291,90 @@ function showToast(message) {
   toast.classList.add("show");
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => toast.classList.remove("show"), 2500);
+}
+
+function readLocalExpenses() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalExpenses(expenses) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+}
+
+function applyFilters(expenses, filters) {
+  return expenses
+    .filter((e) => !filters.category || e.category === filters.category)
+    .filter((e) => !filters.start_date || e.date >= filters.start_date)
+    .filter((e) => !filters.end_date || e.date <= filters.end_date)
+    .sort((a, b) => (b.date.localeCompare(a.date) || b.id - a.id));
+}
+
+async function getExpenses(filters) {
+  if (IS_STATIC_MODE) {
+    return applyFilters(readLocalExpenses(), filters);
+  }
+  const query = buildQuery(filters);
+  return fetch(`${API}${query}`).then((r) => r.json());
+}
+
+async function getSummary(filters) {
+  if (IS_STATIC_MODE) {
+    const filtered = applyFilters(readLocalExpenses(), filters);
+    const byCategoryMap = {};
+    for (const item of filtered) {
+      byCategoryMap[item.category] = byCategoryMap[item.category] || { category: item.category, total: 0, count: 0 };
+      byCategoryMap[item.category].total += Number(item.amount);
+      byCategoryMap[item.category].count += 1;
+    }
+    const by_category = Object.values(byCategoryMap).sort((a, b) => b.total - a.total);
+    const total = filtered.reduce((sum, e) => sum + Number(e.amount), 0);
+    return { total, count: filtered.length, by_category };
+  }
+  const query = buildQuery(filters);
+  return fetch(`/api/summary${query}`).then((r) => r.json());
+}
+
+async function addExpense(payload) {
+  if (IS_STATIC_MODE) {
+    const amount = Number(payload.amount);
+    if (!amount || amount <= 0 || !payload.category) {
+      return { ok: false, error: "Amount and category are required" };
+    }
+    const expenses = readLocalExpenses();
+    const nextId = expenses.length ? Math.max(...expenses.map((e) => Number(e.id))) + 1 : 1;
+    expenses.push({
+      id: nextId,
+      amount,
+      category: payload.category,
+      description: payload.description || "",
+      date: payload.date || new Date().toISOString().slice(0, 10),
+    });
+    writeLocalExpenses(expenses);
+    return { ok: true };
+  }
+  const res = await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    return { ok: false, error: err.error || "Failed to add expense" };
+  }
+  return { ok: true };
+}
+
+async function removeExpense(id) {
+  if (IS_STATIC_MODE) {
+    const expenses = readLocalExpenses().filter((e) => Number(e.id) !== Number(id));
+    writeLocalExpenses(expenses);
+    return;
+  }
+  await fetch(`${API}/${id}`, { method: "DELETE" });
 }
