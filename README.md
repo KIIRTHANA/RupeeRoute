@@ -43,7 +43,7 @@ Your site URL will be:
 
 Notes:
 - GitHub Pages cannot run Flask/Python backends.
-- Static mode stores expenses in browser local storage.
+- Static mode stores account and expense data in browser local storage.
 
 ## Features
 

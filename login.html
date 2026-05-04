@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rupee Route - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./static/style.css">
+</head>
+<body>
+  <div class="bg-blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <div class="auth-page">
+    <div class="auth-card glass">
+      <div class="auth-header">
+        <div class="logo">&#8377;</div>
+        <h1>Rupee Route</h1>
+        <p class="subtitle">See where every rupee goes.</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Sign In</button>
+        <button class="auth-tab" data-tab="register">Sign Up</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <div class="field">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" placeholder="Enter your username" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+        <div id="login-error" class="auth-error"></div>
+        <button type="submit" class="btn-primary">Sign In</button>
+      </form>
+
+      <form id="register-form" class="auth-form" style="display: none;">
+        <div class="field">
+          <label for="reg-display">Display Name</label>
+          <input type="text" id="reg-display" placeholder="What should we call you?" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="reg-username">Username</label>
+          <input type="text" id="reg-username" placeholder="Choose a username" required autocomplete="username" minlength="3">
+        </div>
+        <div class="field">
+          <label for="reg-password">Password</label>
+          <input type="password" id="reg-password" placeholder="Create a password" required autocomplete="new-password" minlength="4">
+        </div>
+        <div id="register-error" class="auth-error"></div>
+        <button type="submit" class="btn-primary">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const USERS_KEY = "rupee_route_static_users_v1";
+    const AUTH_KEY = "rupee_route_static_user_v1";
+
+    const tabs = document.querySelectorAll(".auth-tab");
+    const loginForm = document.getElementById("login-form");
+    const registerForm = document.getElementById("register-form");
+
+    function readUsers() {
+      const raw = localStorage.getItem(USERS_KEY);
+      if (!raw) return [];
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return [];
+      }
+    }
+
+    function writeUsers(users) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    }
+
+    function openApp() {
+      window.location.href = "./index.html";
+    }
+
+    const existing = localStorage.getItem(AUTH_KEY);
+    if (existing) openApp();
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        if (tab.dataset.tab === "login") {
+          loginForm.style.display = "block";
+          registerForm.style.display = "none";
+        } else {
+          loginForm.style.display = "none";
+          registerForm.style.display = "block";
+        }
+        document.getElementById("login-error").textContent = "";
+        document.getElementById("register-error").textContent = "";
+      });
+    });
+
+    loginForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById("login-error");
+      errEl.textContent = "";
+
+      const username = document.getElementById("login-username").value.trim().toLowerCase();
+      const password = document.getElementById("login-password").value;
+      const user = readUsers().find((u) => u.username === username && u.password === password);
+
+      if (!user) {
+        errEl.textContent = "Invalid username or password";
+        return;
+      }
+
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ username: user.username, display_name: user.display_name }));
+      openApp();
+    });
+
+    registerForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById("register-error");
+      errEl.textContent = "";
+
+      const username = document.getElementById("reg-username").value.trim().toLowerCase();
+      const password = document.getElementById("reg-password").value;
+      const displayName = (document.getElementById("reg-display").value.trim() || username);
+
+      if (username.length < 3) {
+        errEl.textContent = "Username must be at least 3 characters";
+        return;
+      }
+      if (password.length < 4) {
+        errEl.textContent = "Password must be at least 4 characters";
+        return;
+      }
+
+      const users = readUsers();
+      if (users.some((u) => u.username === username)) {
+        errEl.textContent = "Username already taken";
+        return;
+      }
+
+      users.push({ username, password, display_name: displayName });
+      writeUsers(users);
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ username, display_name: displayName }));
+      openApp();
+    });
+  </script>
+</body>
+</html>

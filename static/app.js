@@ -2,6 +2,7 @@ const API = "/api/expenses";
 const CURRENCY = "\u20B9";
 const IS_STATIC_MODE = window.location.protocol === "file:" || window.location.hostname.endsWith("github.io");
 const STORAGE_KEY = "rupee_route_expenses_v1";
+const STATIC_AUTH_KEY = "rupee_route_static_user_v1";
 
 const CATEGORY_ICONS = {
   "Food & Dining": "\u{1F354}",
@@ -40,7 +41,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function loadUser() {
   if (IS_STATIC_MODE) {
-    document.getElementById("user-name").textContent = "Guest";
+    const raw = localStorage.getItem(STATIC_AUTH_KEY);
+    if (!raw) {
+      window.location.href = "./login.html";
+      return;
+    }
+    try {
+      const user = JSON.parse(raw);
+      document.getElementById("user-name").textContent = user.display_name || user.username || "Guest";
+    } catch {
+      localStorage.removeItem(STATIC_AUTH_KEY);
+      window.location.href = "./login.html";
+    }
     return;
   }
   try {
@@ -58,9 +70,8 @@ async function loadUser() {
 
 async function handleLogout() {
   if (IS_STATIC_MODE) {
-    localStorage.removeItem(STORAGE_KEY);
-    showToast("Local expense data cleared");
-    refresh();
+    localStorage.removeItem(STATIC_AUTH_KEY);
+    window.location.href = "./login.html";
     return;
   }
   await fetch("/api/auth/logout", { method: "POST" });
